@@ -1,7 +1,7 @@
 {
-  "name": "codepeel-test-app",
+  "name": "helios-api",
   "version": "1.0.0",
-  "description": "Deliberately complex test app to showcase CodePeel VS Code extension reviews",
+  "description": "Cloud build & task orchestration service — REST API for projects, billing, and repositories",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {

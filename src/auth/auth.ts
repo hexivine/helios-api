@@ -43,7 +43,7 @@ export async function login(email: string, password: string): Promise<{ token: s
   //     (logout-all) won't revoke already-issued tokens.
   const token = jwt.sign({ sub: user.id, role: user.role }, JWT_SECRET, {
     expiresIn: TOKEN_TTL_SECONDS,
-    issuer: 'codepeel-test-app',
+    issuer: "helios-api",
   });
   return { token, user };
 }

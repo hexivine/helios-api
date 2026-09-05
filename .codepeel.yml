@@ -1,0 +1,40 @@
+# Helios API — CodePeel review configuration
+# Reviews run automatically on every pull request.
+
+# Files to exclude from review
+ignore_paths:
+  - "dist/**"
+  - "node_modules/**"
+  - "*.generated.ts"
+
+# Custom instructions for the AI reviewer
+custom_instructions: |
+  This is a Node.js/TypeScript REST API.
+  Flag security issues (SQL injection, hardcoded secrets, auth bypasses),
+  concurrency bugs, and resource leaks. Prefer parameterized queries and
+  transactional writes. Do not flag style-only changes.
+
+# Expert rules — enforced on every review
+expert_rules:
+  - "Never interpolate user input into SQL string literals — always use $1 parameters"
+  - "Never commit hardcoded secrets or fallback credentials"
+  - "All async operations must be awaited or explicitly handled"
+  - "Database mutations spanning multiple tables must use transactions"
+
+# Review behavior
+strictMode: false
+securityOnly: false
+ignoreFormatting: true
+
+# Auto description
+auto_description:
+  enabled: true
+  postToGithub: true
+
+# Auto fix
+auto_fix:
+  enabled: false
+
+# Auto test
+auto_test:
+  enabled: false

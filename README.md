@@ -1,41 +1,60 @@
-# CodePeel Test App
+# Helios API
 
-A **deliberately complex** Node.js/TypeScript backend, purpose-built to
-demonstrate the CodePeel VS Code extension's inline code review. The code
-is realistic but intentionally **seeded with security, concurrency, and
-architecture flaws**.
-
-> ⚠️ **NOT for production.** Every flaw is marked with a `[BUG]` comment so
-> reviewers (and CodePeel) can find them easily.
+Helios is a cloud build & task orchestration service. This repository hosts
+the REST API that powers project management, usage billing, and repository
+tooling across the Helios platform.
 
 ## Stack
 
-- Express 4 (REST API)
-- PostgreSQL via `pg`
-- Redis via `ioredis`
-- JWT auth via `jsonwebtoken` + `bcryptjs`
-- TypeScript, strict mode
+- **Express 4** — REST API
+- **PostgreSQL** (`pg`) — primary datastore
+- **Redis** (`ioredis`) — usage counters, ephemeral state
+- **JWT auth** (`jsonwebtoken` + `bcryptjs`)
+- **TypeScript** — strict mode
 
-## Seeded flaw map
+## Structure
 
-| Area | Flaw |
-|------|------|
-| `src/auth/auth.ts` | Hardcoded JWT fallback secret · SQL injection in `findUserByEmail`/`login` · missing `session_version` claim · lax reset-token validation · JWT algorithm-confusion in `verifyToken` |
-| `src/db/projects.ts` | N+1 query in `listProjectsForOwner` · non-transactional `transferProject` · malformed-JSON 500s in `getProjectMetadata` |
-| `src/db/pool.ts` | Pool never drained on shutdown · dead-socket leak on idle error |
-| `src/services/billing.ts` | Lost-update race in `deductBalance` · unbounded cache keys (no TTL) · non-idempotent invoice reconcile |
-| `src/services/repository.ts` | Command injection in `cloneRepository` · off-by-one in `paginate` · unawaited `forEach` async · unbounded memo cache |
-| `src/utils/redis.ts` | No retry strategy · health-failure counter grows forever |
-| `src/utils/errors.ts` | `toSafeError` swallows original stack |
-| `src/config/env.ts` | Env snapshot at import; secrets rotation sticky |
-| `src/api/routes.ts` | Missing auth on `/users/:id/projects` · unhandled rejection in `/usage` · no zod validation · `Number()` coercion bugs |
-| `src/index.ts` | Missing global error handler · unawaited health query · error detail leak |
+```
+src/
+  api/        Express route handlers
+  auth/       JWT issuance, token verification, password reset
+  config/     Runtime env configuration
+  db/         PostgreSQL queries (pool, projects)
+  services/   Business logic (billing, repository tooling)
+  utils/      Shared helpers (errors, redis client)
+```
 
-## Install & run
+## Getting started
 
 ```bash
 npm install
+cp .env.example .env   # set DATABASE_URL + REDIS_URL
 npm run dev
 ```
 
-Point a `.env` at a Postgres URL (`DATABASE_URL`) and Redis (`REDIS_URL`).
+### Scripts
+
+| Command          | Description                    |
+|------------------|--------------------------------|
+| `npm run dev`    | Watch-mode dev server          |
+| `npm run build`  | Compile TypeScript to `dist/`  |
+| `npm run start`  | Run compiled server            |
+| `npm run typecheck` | Type-only check (`tsc --noEmit`) |
+
+## Endpoints
+
+| Method | Path                         | Description                     |
+|--------|------------------------------|---------------------------------|
+| POST   | `/api/login`                 | Authenticate and get a JWT      |
+| GET    | `/api/users/:userId/projects`| List a user's projects          |
+| POST   | `/api/projects/:id/transfer` | Transfer a project (admin)      |
+| GET    | `/api/projects/:id/metadata` | Project metadata (admin)        |
+| POST   | `/api/billing/deduct`        | Deduct from a user's balance    |
+| POST   | `/api/usage`                 | Record usage traffic            |
+| POST   | `/api/repos/clone`           | Clone an external repo          |
+| GET    | `/api/projects`              | Paginated project list          |
+| GET    | `/health`                    | Liveness probe                  |
+
+## License
+
+MIT

@@ -33,5 +33,5 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
 });
 
 app.listen(env.PORT, () => {
-  console.log(`codepeel-test-app listening on :${env.PORT}`);
+  console.log(`helios-api listening on :${env.PORT}`);
 });
