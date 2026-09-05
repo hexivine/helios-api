@@ -1,21 +1,24 @@
 import express from 'express';
 import helmet from 'helmet';
-import { router } from './api/routes.js';
+import { v1 } from './routes/v1.js';
 import { env } from './config/env.js';
 import { pool } from './db/pool.js';
 import { redis } from './utils/redis.js';
+import { startWorker } from './jobs/worker.js';
 import { AppError } from './utils/errors.js';
+import { corsAllowAll } from './middleware/auth.js';
 
 const app = express();
 app.use(helmet());
 app.use(express.json());
+app.use(corsAllowAll);
 
-app.use('/api', router);
+app.use('/api/v1', v1);
 
 // ── [BUG] Missing global error handler: async route errors that escape the
 //     per-route try/catch reach Express default handler which returns HTML,
 //     leaks stack traces, and doesn't send a JSON body.
-app.get('/health', async (_req, res) => {
+app.get('/health', (_req, res) => {
   // [BUG] never awaited — if pool.query rejects, this is an unhandledRejection.
   pool.query('SELECT 1').then(() => {
     res.json({ ok: true });
@@ -31,6 +34,9 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
   // [BUG] leaks internal error details to the client.
   res.status(500).json({ error: 'Internal server error', detail: String(err) });
 });
+
+// Background worker — [BUG] startWorker has a 200ms busy-wait loop.
+startWorker();
 
 app.listen(env.PORT, () => {
   console.log(`helios-api listening on :${env.PORT}`);

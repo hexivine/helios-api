@@ -16,12 +16,17 @@ tooling across the Helios platform.
 
 ```
 src/
-  api/        Express route handlers
-  auth/       JWT issuance, token verification, password reset
-  config/     Runtime env configuration
-  db/         PostgreSQL queries (pool, projects)
-  services/   Business logic (billing, repository tooling)
-  utils/      Shared helpers (errors, redis client)
+  auth/         JWT issuance, token verification, password reset
+  config/       Runtime env configuration
+  controllers/  Request handlers (users, deployments, keys, webhooks)
+  db/           PostgreSQL queries (pool, projects)
+  integrations/ External services (Slack, email)
+  jobs/         Background worker
+  middleware/   Auth, validation, rate limiting
+  routes/       Express router (v1)
+  services/     Business logic (billing, repository tooling)
+  types/        Shared TS types
+  utils/        Shared helpers (errors, redis client)
 ```
 
 ## Getting started
@@ -45,14 +50,16 @@ npm run dev
 
 | Method | Path                         | Description                     |
 |--------|------------------------------|---------------------------------|
-| POST   | `/api/login`                 | Authenticate and get a JWT      |
-| GET    | `/api/users/:userId/projects`| List a user's projects          |
-| POST   | `/api/projects/:id/transfer` | Transfer a project (admin)      |
-| GET    | `/api/projects/:id/metadata` | Project metadata (admin)        |
-| POST   | `/api/billing/deduct`        | Deduct from a user's balance    |
-| POST   | `/api/usage`                 | Record usage traffic            |
-| POST   | `/api/repos/clone`           | Clone an external repo          |
-| GET    | `/api/projects`              | Paginated project list          |
+| POST   | `/api/v1/login`              | Authenticate and get a JWT      |
+| GET    | `/api/v1/users/:userId`      | Get a user profile              |
+| PATCH  | `/api/v1/users/:userId`      | Update a user profile           |
+| POST   | `/api/v1/projects/:id/deployments` | Trigger a deployment       |
+| GET    | `/api/v1/projects/:projectId/deployments` | List deployments       |
+| POST   | `/api/v1/keys`               | Create an API key               |
+| POST   | `/api/v1/keys/revoke`        | Revoke an API key               |
+| GET    | `/api/v1/admin/health`       | Admin health check              |
+| POST   | `/api/v1/webhooks/github`    | GitHub webhook receiver         |
+| POST   | `/api/v1/exports`            | Rate-limited export             |
 | GET    | `/health`                    | Liveness probe                  |
 
 ## License
