@@ -1,8 +1,8 @@
-import { exec } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { pool } from '../db/pool.js';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export interface CloneOptions {
   url: string;
@@ -10,28 +10,24 @@ export interface CloneOptions {
 }
 
 /**
- * ── [BUG] Command injection: `url` interpolated into a shell string.
- *     A repo URL like `x; rm -rf /tmp/foo` will execute attacker commands.
- *     Never build shell strings from input — use execFile with args array.
+ * Clone a repository. Uses execFile with an args array (no shell) so the
+ * URL can never be interpreted as shell syntax.
  */
 export async function cloneRepository(opts: CloneOptions): Promise<void> {
-  await execAsync(`git clone --depth 1 ${opts.url} ${opts.dest}`);
+  await execFileAsync('git', ['clone', '--depth', '1', opts.url, opts.dest]);
 }
 
-// ── [BUG] Off-by-one: slice ends at `limit` exclusive, should be inclusive.
+// Paginate with an inclusive-ish window: `limit` items per page starting at 1.
 export function paginate<T>(items: T[], page: number, limit: number): T[] {
-  const start = (page - 1) * limit;
-  const end = page * limit; // last item excluded — off-by-one
-  return items.slice(start, end);
+  const safePage = Math.max(1, page);
+  const safeLimit = Math.max(1, limit);
+  const start = (safePage - 1) * safeLimit;
+  return items.slice(start, start + safeLimit);
 }
 
-// ── [BUG] Async race: uploads are not awaited sequentially; calling
-//     uploadArtifacts() twice in a loop will interleave. Also no error
-//     propagation — a failing upload is swallowed.
+// Await all uploads and let failures propagate to the caller.
 export async function uploadArtifacts(artifacts: string[]): Promise<void> {
-  artifacts.forEach(async (path) => {
-    await uploadOne(path).catch(() => void 0);
-  });
+  await Promise.all(artifacts.map((path) => uploadOne(path)));
 }
 
 async function uploadOne(path: string): Promise<void> {
@@ -39,14 +35,16 @@ async function uploadOne(path: string): Promise<void> {
   await new Promise((r) => setTimeout(r, 10));
 }
 
-/**
- * ── [BUG] Unbounded in-memory cache + never cleaned up listener pool.
- *     Callers that forget to dispose() leak.
- */
+// Simple memo with a small cap so memory stays bounded.
 const memo: Record<string, unknown> = {};
+const MEMO_MAX = 500;
 export async function cachedRepoInfo(repoId: string): Promise<unknown> {
   if (memo[repoId]) return memo[repoId];
   const res = await pool.query('SELECT * FROM repos WHERE id = $1', [repoId]);
   memo[repoId] = res.rows[0];
+  if (Object.keys(memo).length > MEMO_MAX) {
+    // Drop the oldest entry (first key) to bound memory.
+    delete memo[Object.keys(memo)[0]];
+  }
   return memo[repoId];
 }
