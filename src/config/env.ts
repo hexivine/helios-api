@@ -20,6 +20,9 @@ export const env = {
   APP_URL: process.env.APP_URL || 'http://localhost:3001',
 };
 
-// ── [BUG] Env is snapshotted at import time. If the deployment system
-//     rotates SECRETS and restarts, the old value lingers until hard
-//     restart. Should read lazily.
+// Secrets are read-through a lazy getter so rotated values are picked up.
+export const secrets = {
+  slackToken: () => process.env.SLACK_TOKEN || '',
+  emailApiKey: () => process.env.EMAIL_API_KEY || '',
+  jwtSecret: () => process.env.JWT_SECRET || '',
+};
