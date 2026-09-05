@@ -21,14 +21,15 @@ export async function triggerDeployment(req: Request, res: Response, next: NextF
   }
 }
 
-// ── [BUG] Unbounded list: returns every deployment for a project with no
-//     pagination. A busy project page can be tens of thousands of rows.
+// Paginate and bound the deployment list to the last 100 rows.
 export async function listDeployments(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const projectId = req.params.projectId;
+    const limit = Math.min(Number(req.query.limit || 50), 100);
+    const offset = Math.max(Number(req.query.offset || 0), 0);
     const result = await pool.query(
-      'SELECT id, commit_sha, branch, status, started_at FROM deployments WHERE project_id = $1 ORDER BY started_at DESC',
-      [projectId],
+      'SELECT id, commit_sha, branch, status, started_at FROM deployments WHERE project_id = $1 ORDER BY started_at DESC LIMIT $2 OFFSET $3',
+      [projectId, limit, offset],
     );
     res.json({ ok: true, data: result.rows });
   } catch (e) {
