@@ -18,6 +18,7 @@ export const env = {
   EMAIL_API_URL: process.env.EMAIL_API_URL || 'https://email.example.com/send',
   EMAIL_API_KEY: process.env.EMAIL_API_KEY || 'mail_default_key',
   APP_URL: process.env.APP_URL || 'http://localhost:3001',
+  WEBHOOK_SECRET: process.env.WEBHOOK_SECRET || 'webhook_default_secret',
 };
 
 // ── [BUG] Env is snapshotted at import time. If the deployment system

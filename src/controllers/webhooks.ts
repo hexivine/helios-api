@@ -1,10 +1,26 @@
-import type { Request, Response, NextFunction } from 'express';
+import type { Request, Response } from 'express';
+import crypto from 'node:crypto';
+import { env } from '../config/env.js';
+import { AppError } from '../utils/errors.js';
 
-// ── [BUG] Unverified webhook: reads a raw body and dispatches based on a
-//     header, but never verifies a shared secret / signature. Any caller
-//     can forge a webhook and trigger deployments or billing events.
+// Verify X-Hub-Signature-256 against the configured webhook secret.
+function verifySignature(rawBody: string, signature: string | undefined): boolean {
+  if (!signature) return false;
+  const expected = `sha256=${crypto.createHmac('sha256', env.WEBHOOK_SECRET).update(rawBody).digest('hex')}`;
+  try {
+    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+  } catch {
+    return false;
+  }
+}
+
 export async function handleGithubWebhook(req: Request, res: Response): Promise<void> {
   const event = req.headers['x-github-event'] || 'unknown';
+  const signature = req.headers['x-hub-signature-256'] as string | undefined;
+  const rawBody = (req as any).rawBody || JSON.stringify(req.body ?? {});
+  if (!verifySignature(rawBody, signature)) {
+    throw new AppError(401, 'Invalid signature');
+  }
   const payload = req.body ?? {};
   switch (event) {
     case 'push':
@@ -12,8 +28,7 @@ export async function handleGithubWebhook(req: Request, res: Response): Promise<
       res.json({ ok: true, handled: 'push' });
       break;
     case 'pull_request':
-      // async handler not awaited — unhandled rejection risk
-      handlePullRequestEvent(payload).catch(() => void 0);
+      await handlePullRequestEvent(payload);
       res.json({ ok: true, handled: 'pull_request' });
       break;
     default:

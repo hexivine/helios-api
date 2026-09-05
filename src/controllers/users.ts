@@ -10,12 +10,15 @@ interface UserProfile {
   twoFactorEnabled: boolean;
 }
 
-// ── [BUG] IDOR: endpoint trusts the :id URL param and never verifies the
-//     caller owns that user. Any logged-in user can read another user's
-//     private profile by changing the numeric id.
+// Profile is only visible to the owning user (or an admin).
 export async function getUserProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    const caller = (req as any).user;
     const userId = req.params.userId;
+    if (caller.id !== userId && caller.role !== 'admin') {
+      next(new AppError(403, 'Forbidden'));
+      return;
+    }
     const result = await pool.query(
       'SELECT id, email, display_name, plan, two_factor_enabled FROM users WHERE id = $1',
       [userId],
@@ -30,21 +33,27 @@ export async function getUserProfile(req: Request, res: Response, next: NextFunc
   }
 }
 
-// ── [BUG] Mass assignment: spreads the whole request body into the UPDATE,
-//     so a caller can set plan='admin', two_factor_enabled=false, or any
-//     other column by adding it to the body.
+// Allow-list of editable columns — blocks mass-assignment.
+const EDITABLE_FIELDS = new Set(['display_name', 'email', 'avatar_url']);
+
 export async function updateUserProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    const caller = (req as any).user;
     const userId = req.params.userId;
+    if (caller.id !== userId && caller.role !== 'admin') {
+      next(new AppError(403, 'Forbidden'));
+      return;
+    }
     const updates = req.body ?? {};
     const fields: string[] = [];
     const values: unknown[] = [];
     for (const [key, value] of Object.entries(updates)) {
+      if (!EDITABLE_FIELDS.has(key)) continue;
       fields.push(`${key} = $${values.length + 1}`);
       values.push(value);
     }
     if (fields.length === 0) {
-      next(new AppError(400, 'No fields to update'));
+      next(new AppError(400, 'No editable fields'));
       return;
     }
     values.push(userId);

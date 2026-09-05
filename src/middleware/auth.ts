@@ -23,12 +23,22 @@ export function requireAdmin(req: Request, _res: Response, next: NextFunction): 
   next();
 }
 
-// ── [BUG] No origin/host allowlist: this middleware trusts any Origin
-//     header and attaches 'Access-Control-Allow-Origin' from it, which
-//     lets any site make authenticated requests from a victim browser.
+// Allowlist instead of reflect: only known origins may set credentials.
+const ALLOWED_ORIGINS = new Set([
+  'https://helios.run',
+  'https://app.helios.run',
+  'http://localhost:3000',
+]);
+
 export function corsAllowAll(req: Request, res: Response, next: NextFunction): void {
-  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  const origin = req.headers.origin || '';
+  const isAllowed = origin ? ALLOWED_ORIGINS.has(origin) : false;
+  if (isAllowed) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', '');
+  }
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   if (req.method === 'OPTIONS') {
